@@ -22,6 +22,7 @@ import { publishLiveEvent } from "./live-events.js";
 import { getRunLogStore, type RunLogHandle } from "./run-log-store.js";
 import { getServerAdapter, runningProcesses } from "../adapters/index.js";
 import type { AdapterExecutionResult, AdapterInvocationMeta, AdapterSessionCodec, UsageSummary } from "../adapters/index.js";
+import { createHash } from "node:crypto";
 import { createLocalAgentJwt } from "../agent-auth-jwt.js";
 import { parseObject, asBoolean, asNumber, appendWithCap, MAX_EXCERPT_BYTES } from "../adapters/utils.js";
 import { costService } from "./costs.js";
@@ -3816,8 +3817,13 @@ export function heartbeatService(db: Db) {
 
         checked += 1;
         const baseline = new Date(agent.lastHeartbeatAt ?? agent.createdAt).getTime();
+        // Add a deterministic per-agent jitter offset (0–60 s) derived from
+        // the agent ID hash.  This spreads agents with the same heartbeat
+        // interval across the window so they don't all fire in the same
+        // scheduler tick ("thundering herd").
+        const jitterMs = (parseInt(createHash("md5").update(agent.id).digest("hex").slice(0, 8), 16) % 60000);
         const elapsedMs = now.getTime() - baseline;
-        if (elapsedMs < policy.intervalSec * 1000) continue;
+        if (elapsedMs < policy.intervalSec * 1000 + jitterMs) continue;
 
         const run = await enqueueWakeup(agent.id, {
           source: "timer",

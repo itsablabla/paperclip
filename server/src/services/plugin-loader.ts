@@ -27,7 +27,6 @@
 import { existsSync } from "node:fs";
 import { readdir, readFile, rm, stat } from "node:fs/promises";
 import { execFile } from "node:child_process";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -38,6 +37,7 @@ import type {
   PluginRecord,
   PluginUiSlotDeclaration,
 } from "@paperclipai/shared";
+import { resolvePaperclipHomeDir } from "../home-paths.js";
 import { logger } from "../middleware/logger.js";
 import { pluginManifestValidator } from "./plugin-manifest-validator.js";
 import { pluginCapabilityValidator } from "./plugin-capability-validator.js";
@@ -68,11 +68,14 @@ export const NPM_PLUGIN_PACKAGE_PREFIX = "paperclip-plugin-";
  * Default local plugin directory.  The loader scans this directory for
  * locally-installed plugin packages.
  *
+ * Uses `resolvePaperclipHomeDir()` so that when `PAPERCLIP_HOME` points to a
+ * persistent volume (e.g. `/paperclip` on Railway) the installed npm packages
+ * survive container restarts and redeployments.
+ *
  * @see PLUGIN_SPEC.md §8.1 — On-Disk Layout
  */
 export const DEFAULT_LOCAL_PLUGIN_DIR = path.join(
-  os.homedir(),
-  ".paperclip",
+  resolvePaperclipHomeDir(),
   "plugins",
 );
 
